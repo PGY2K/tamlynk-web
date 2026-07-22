@@ -1,26 +1,44 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
+
     async function finishAuthentication() {
       const { data, error: sessionError } = await supabase.auth.getSession();
       if (!active) return;
-      if (sessionError) setError(sessionError.message);
-      else if (data.session) { const next=sessionStorage.getItem("tamlynk_auth_next"); sessionStorage.removeItem("tamlynk_auth_next"); router.replace(next || "/dashboard"); }
-      else setError("The confirmation link is invalid or has expired.");
+
+      if (sessionError) {
+        setError(sessionError.message);
+        return;
+      }
+
+      if (data.session) {
+        const queryNext = searchParams.get("next");
+        const storedNext = localStorage.getItem("tamlynk_auth_next") || sessionStorage.getItem("tamlynk_auth_next");
+        const next = queryNext || storedNext || "/dashboard";
+
+        localStorage.removeItem("tamlynk_auth_next");
+        sessionStorage.removeItem("tamlynk_auth_next");
+        router.replace(next);
+        return;
+      }
+
+      setError("The confirmation link is invalid or has expired.");
     }
+
     finishAuthentication();
     return () => { active = false; };
-  }, [router]);
+  }, [router, searchParams]);
 
   return (
     <main className="auth-status-page">
@@ -29,5 +47,13 @@ export default function AuthCallbackPage() {
       <p>{error || "You will be redirected automatically."}</p>
       {error && <Link className="button" href="/sign-in">Return to Sign In</Link>}
     </main>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={<main className="auth-status-page"><p>Confirming your TamLynk account...</p></main>}>
+      <AuthCallbackContent />
+    </Suspense>
   );
 }

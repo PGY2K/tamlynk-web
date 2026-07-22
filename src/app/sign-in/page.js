@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthShell from "@/components/AuthShell";
@@ -9,27 +9,50 @@ import { supabase } from "@/lib/supabase";
 function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const next = searchParams.get("next") || "";
+  const tenantInvitationMode = next.startsWith("/connect");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const signUpHref = useMemo(() => {
+    if (!next) return "/sign-up";
+    const typePart = tenantInvitationMode ? "type=tenant&" : "";
+    return `/sign-up?${typePart}next=${encodeURIComponent(next)}`;
+  }, [next, tenantInvitationMode]);
+
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
     setLoading(true);
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
     setLoading(false);
+
     if (signInError) {
       setError(signInError.message);
       return;
     }
-    router.push(searchParams.get("next") || "/dashboard");
+
+    router.push(next || "/dashboard");
   }
 
   return (
-    <AuthShell eyebrow="Welcome back" title="Sign in to TamLynk." description="Access your properties, tenants, leases, and account activity."
-      footer={<>New to TamLynk? <Link href="/sign-up">Create an account</Link></>}>
+    <AuthShell
+      eyebrow={tenantInvitationMode ? "Tenant invitation" : "Welcome back"}
+      title={tenantInvitationMode ? "Sign in to connect your unit." : "Sign in to TamLynk."}
+      description={
+        tenantInvitationMode
+          ? "Use your tenant account to finish connecting with your landlord."
+          : "Access your properties, tenants, leases, and account activity."
+      }
+      footer={<>New to TamLynk? <Link href={signUpHref}>{tenantInvitationMode ? "Create a tenant account" : "Create an account"}</Link></>}
+    >
       <form className="auth-form" onSubmit={handleSubmit}>
         <label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></label>
         <label>Password<div className="label-row"><span></span><Link href="/forgot-password">Forgot password?</Link></div><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>
@@ -40,4 +63,10 @@ function SignInContent() {
   );
 }
 
-export default function SignInPage(){return <Suspense fallback={<main className="dashboard-loading"><p>Loading sign in...</p></main>}><SignInContent/></Suspense>}
+export default function SignInPage() {
+  return (
+    <Suspense fallback={<main className="dashboard-loading"><p>Loading sign in...</p></main>}>
+      <SignInContent />
+    </Suspense>
+  );
+}
