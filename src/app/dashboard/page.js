@@ -122,8 +122,8 @@ export default function DashboardPage() {
 
         <nav className="primary-nav">
           <small>Workspace</small>
-          {navItems.map(([icon, label], index) => (label === "Properties" || label === "Units") ? (
-            <Link className="primary-nav-link" href={label === "Units" ? "/units" : "/properties"} key={label}><Icon name={icon} /><span>{label}</span></Link>
+          {navItems.map(([icon, label], index) => (["Properties", "Units", "Tenants"].includes(label)) ? (
+            <Link className="primary-nav-link" href={label === "Units" ? "/units" : label === "Tenants" ? "/tenants" : "/properties"} key={label}><Icon name={icon} /><span>{label}</span></Link>
           ) : (
             <button className={index === 0 ? "active" : ""} key={label} type="button"><Icon name={icon} /><span>{label}</span>{label === "Maintenance" && <em>0</em>}</button>
           ))}
@@ -205,7 +205,7 @@ function LandlordDashboard({ groups, openGroups, deleteGroup, properties }) {
           <Link href="/properties"><span><Icon name="properties" /></span><strong>Add property</strong><small>Create or manage properties</small></Link>
           <button onClick={openGroups}><span><Icon name="folder" /></span><strong>Create group</strong><small>Organize your portfolio</small></button>
           <Link href="/invitations"><span><Icon name="qr" /></span><strong>Generate QR</strong><small>Connect a tenant to a unit</small></Link>
-          <button><span><Icon name="tenants" /></span><strong>View tenants</strong><small>Manage connected renters</small></button>
+          <Link href="/tenants"><span><Icon name="tenants" /></span><strong>View tenants</strong><small>Manage connected renters</small></Link>
         </div>
       </section>
     </div>
