@@ -27,11 +27,28 @@ function ConnectFlow() {
       localStorage.setItem(PENDING_CODE_KEY, startingCode);
     }
 
-    supabase.auth.getUser().then(({ data, error: userError }) => {
-      if (userError) setError(userError.message);
-      setUser(data?.user || null);
+    let mounted = true;
+
+    async function loadSession() {
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (!mounted) return;
+
+      if (sessionError) setError(sessionError.message);
+      setUser(data?.session?.user || null);
       setStatus("ready");
+    }
+
+    loadSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
+      setUser(session?.user || null);
     });
+
+    return () => {
+      mounted = false;
+      authListener?.subscription?.unsubscribe();
+    };
   }, [search]);
 
   async function lookUp(codeToFind = code) {
@@ -173,17 +190,25 @@ function ConnectFlow() {
                 <span>{preview.property_name}</span>
                 <p>This invitation expires {new Date(preview.expires_at).toLocaleString()}.</p>
 
-                <button className="button full-button" type="button" onClick={accept} disabled={status === "saving"}>
-                  {status === "saving" ? "Connecting..." : user ? "Connect my tenant account" : "Sign in to connect"}
-                </button>
-
-                {!user && (
-                  <small>
-                    New tenant?{" "}
-                    <Link href={`/sign-up?type=tenant&next=${encodeURIComponent(nextPath)}`}>
-                      Create a tenant account
+                {user ? (
+                  <button className="button full-button" type="button" onClick={accept} disabled={status === "saving"}>
+                    {status === "saving" ? "Connecting..." : "Connect my tenant account"}
+                  </button>
+                ) : (
+                  <div className="connect-auth-actions">
+                    <Link
+                      className="button full-button"
+                      href={`/sign-in?next=${encodeURIComponent(nextPath)}`}
+                    >
+                      Sign In
                     </Link>
-                  </small>
+                    <Link
+                      className="button button-secondary full-button"
+                      href={`/sign-up?type=tenant&next=${encodeURIComponent(nextPath)}`}
+                    >
+                      Create Tenant Account
+                    </Link>
+                  </div>
                 )}
               </div>
             )}
