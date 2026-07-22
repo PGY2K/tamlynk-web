@@ -1,9 +1,13 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "TamLynk",
+  title: "TamLynk | Tenant and Management, TamLynked Together",
   description:
-    "Modern property management software connecting tenants and property managers.",
+    "Manage properties, tenants, leases, rent, maintenance, and documents from one modern property management platform.",
+  icons: {
+    icon: "/tamlynk-logo.png",
+    apple: "/tamlynk-logo.png",
+  },
 };
 
 export default function RootLayout({ children }) {
