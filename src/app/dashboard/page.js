@@ -160,7 +160,7 @@ export default function DashboardPage() {
           {!isTenant && <div className="page-actions"><Link className="button button-secondary" href="/invitations"><Icon name="qr" /> Generate QR</Link><Link className="button" href="/properties"><Icon name="plus" /> Add Property</Link></div>}
         </div>
 
-        {isTenant ? <TenantDashboard /> : <LandlordDashboard groups={groups} openGroups={() => setGroupModal(true)} deleteGroup={deleteGroup} properties={metadata.properties || []} />}
+        {isTenant ? <TenantDashboard user={user} /> : <LandlordDashboard groups={groups} openGroups={() => setGroupModal(true)} deleteGroup={deleteGroup} properties={metadata.properties || []} />}
       </section>
 
       {groupModal && (
@@ -217,13 +217,42 @@ function LandlordDashboard({ groups, openGroups, deleteGroup, properties }) {
   </>;
 }
 
-function TenantDashboard() {
+function TenantDashboard({ user }) {
+  const [assignment, setAssignment] = useState(null);
+  const [assignmentLoading, setAssignmentLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadAssignment() {
+      const { data, error } = await supabase
+        .from("tenant_profiles")
+        .select("property_name, unit_name, status")
+        .eq("tenant_user_id", user.id)
+        .eq("status", "active")
+        .order("connected_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!active) return;
+      if (!error) setAssignment(data || null);
+      setAssignmentLoading(false);
+    }
+
+    loadAssignment();
+    return () => { active = false; };
+  }, [user.id]);
+
+  const linked = Boolean(assignment?.property_name || assignment?.unit_name);
+
   return <>
     <div className="dashboard-stat-grid polished tenant-stats">
-      <article><span className="stat-icon purple"><Icon name="properties" /></span><div><small>Current property</small><strong>Not linked</strong><p>Scan a landlord QR to connect</p></div></article>
+      <article><span className="stat-icon purple"><Icon name="properties" /></span><div><small>Current property</small><strong>{assignmentLoading ? "Loading..." : assignment?.property_name || "Not linked"}</strong><p>{assignment?.unit_name ? `Unit: ${assignment.unit_name}` : "Scan a landlord QR to connect"}</p></div></article>
       <article><span className="stat-icon green"><Icon name="rent" /></span><div><small>Amount due</small><strong>$0</strong><p>No balance due</p></div></article>
       <article><span className="stat-icon amber"><Icon name="maintenance" /></span><div><small>Open maintenance</small><strong>0</strong><p>No open requests</p></div></article>
     </div>
-    <section className="dashboard-card tenant-connect-card"><span className="modal-icon"><Icon name="qr" /></span><h2>Connect with your landlord</h2><p>Scan the 24-hour QR code provided by your landlord. You’ll be automatically connected to the correct property and unit after signing in.</p><Link className="button" href="/connect"><Icon name="qr" /> Enter Unit Code</Link></section>
+    {!linked && !assignmentLoading && <section className="dashboard-card tenant-connect-card"><span className="modal-icon"><Icon name="qr" /></span><h2>Connect with your landlord</h2><p>Scan the 24-hour QR code provided by your landlord. You’ll be automatically connected to the correct property and unit after signing in.</p><Link className="button" href="/connect"><Icon name="qr" /> Enter Unit Code</Link></section>}
+    {linked && <section className="dashboard-card tenant-connect-card"><span className="modal-icon"><Icon name="properties" /></span><h2>You’re connected</h2><p>Your tenant account is linked to <strong>{assignment.property_name}</strong>{assignment.unit_name ? `, ${assignment.unit_name}` : ""}.</p></section>}
   </>;
 }
+
