@@ -67,7 +67,7 @@ export default function DashboardPage() {
   const navItems = useMemo(() => isTenant ? [
     ["overview", "Overview"], ["rent", "Payments"], ["maintenance", "Maintenance"], ["lease", "Lease"], ["documents", "Documents"]
   ] : [
-    ["overview", "Overview"], ["properties", "Properties"], ["tenants", "Tenants"], ["lease", "Leases"], ["rent", "Rent"], ["maintenance", "Maintenance"], ["documents", "Documents"]
+    ["overview", "Overview"], ["properties", "Properties"], ["properties", "Units"], ["tenants", "Tenants"], ["lease", "Leases"], ["rent", "Rent"], ["maintenance", "Maintenance"], ["documents", "Documents"]
   ], [isTenant]);
 
   async function signOut() {
@@ -122,8 +122,8 @@ export default function DashboardPage() {
 
         <nav className="primary-nav">
           <small>Workspace</small>
-          {navItems.map(([icon, label], index) => label === "Properties" ? (
-            <Link className="primary-nav-link" href="/properties" key={label}><Icon name={icon} /><span>{label}</span></Link>
+          {navItems.map(([icon, label], index) => (label === "Properties" || label === "Units") ? (
+            <Link className="primary-nav-link" href={label === "Units" ? "/units" : "/properties"} key={label}><Icon name={icon} /><span>{label}</span></Link>
           ) : (
             <button className={index === 0 ? "active" : ""} key={label} type="button"><Icon name={icon} /><span>{label}</span>{label === "Maintenance" && <em>0</em>}</button>
           ))}
