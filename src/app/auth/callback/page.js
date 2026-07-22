@@ -15,7 +15,7 @@ export default function AuthCallbackPage() {
       const { data, error: sessionError } = await supabase.auth.getSession();
       if (!active) return;
       if (sessionError) setError(sessionError.message);
-      else if (data.session) router.replace("/dashboard");
+      else if (data.session) { const next=sessionStorage.getItem("tamlynk_auth_next"); sessionStorage.removeItem("tamlynk_auth_next"); router.replace(next || "/dashboard"); }
       else setError("The confirmation link is invalid or has expired.");
     }
     finishAuthentication();

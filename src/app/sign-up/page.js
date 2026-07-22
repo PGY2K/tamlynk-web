@@ -15,8 +15,11 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const selectedPlan = new URLSearchParams(window.location.search).get("plan");
+    const params = new URLSearchParams(window.location.search);
+    const selectedPlan = params.get("plan");
+    const selectedType = params.get("type");
     if (["free", "pro", "enterprise"].includes(selectedPlan)) setPlan(selectedPlan);
+    if (selectedType === "tenant") setForm((current) => ({ ...current, accountType: "tenant" }));
   }, []);
 
   function updateField(event) {
@@ -38,6 +41,8 @@ export default function SignUpPage() {
     }
 
     setLoading(true);
+    const next = new URLSearchParams(window.location.search).get("next");
+    if (next) sessionStorage.setItem("tamlynk_auth_next", next);
     const redirectTo = `${window.location.origin}/auth/callback`;
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: form.email.trim(),
@@ -59,7 +64,7 @@ export default function SignUpPage() {
     }
 
     if (data.session) {
-      router.push("/dashboard");
+      router.push(next || "/dashboard");
       return;
     }
 

@@ -157,7 +157,7 @@ export default function DashboardPage() {
 
         <div className="dashboard-page-head">
           <div><span className="auth-kicker">{isTenant ? "Your rental, all in one place" : "Portfolio overview"}</span><h1>Welcome back, {firstName}.</h1><p>{isTenant ? "Your lease, payments, maintenance, and documents will appear here." : "Here’s what’s happening across your properties today."}</p></div>
-          {!isTenant && <div className="page-actions"><button className="button button-secondary"><Icon name="qr" /> Generate QR</button><Link className="button" href="/properties"><Icon name="plus" /> Add Property</Link></div>}
+          {!isTenant && <div className="page-actions"><Link className="button button-secondary" href="/invitations"><Icon name="qr" /> Generate QR</Link><Link className="button" href="/properties"><Icon name="plus" /> Add Property</Link></div>}
         </div>
 
         {isTenant ? <TenantDashboard /> : <LandlordDashboard groups={groups} openGroups={() => setGroupModal(true)} deleteGroup={deleteGroup} properties={metadata.properties || []} />}
@@ -204,7 +204,7 @@ function LandlordDashboard({ groups, openGroups, deleteGroup, properties }) {
         <div className="quick-action-grid">
           <Link href="/properties"><span><Icon name="properties" /></span><strong>Add property</strong><small>Create or manage properties</small></Link>
           <button onClick={openGroups}><span><Icon name="folder" /></span><strong>Create group</strong><small>Organize your portfolio</small></button>
-          <button><span><Icon name="qr" /></span><strong>Generate QR</strong><small>Connect a tenant in seconds</small></button>
+          <Link href="/invitations"><span><Icon name="qr" /></span><strong>Generate QR</strong><small>Connect a tenant to a unit</small></Link>
           <button><span><Icon name="tenants" /></span><strong>View tenants</strong><small>Manage connected renters</small></button>
         </div>
       </section>
@@ -224,6 +224,6 @@ function TenantDashboard() {
       <article><span className="stat-icon green"><Icon name="rent" /></span><div><small>Amount due</small><strong>$0</strong><p>No balance due</p></div></article>
       <article><span className="stat-icon amber"><Icon name="maintenance" /></span><div><small>Open maintenance</small><strong>0</strong><p>No open requests</p></div></article>
     </div>
-    <section className="dashboard-card tenant-connect-card"><span className="modal-icon"><Icon name="qr" /></span><h2>Connect with your landlord</h2><p>Scan the 24-hour QR code provided by your landlord. You’ll be automatically connected to the correct property and unit after signing in.</p><button className="button"><Icon name="qr" /> Scan QR Code</button></section>
+    <section className="dashboard-card tenant-connect-card"><span className="modal-icon"><Icon name="qr" /></span><h2>Connect with your landlord</h2><p>Scan the 24-hour QR code provided by your landlord. You’ll be automatically connected to the correct property and unit after signing in.</p><Link className="button" href="/connect"><Icon name="qr" /> Enter Unit Code</Link></section>
   </>;
 }

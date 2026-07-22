@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AuthShell from "@/components/AuthShell";
 import { supabase } from "@/lib/supabase";
 
-export default function SignInPage() {
+function SignInContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -23,7 +24,7 @@ export default function SignInPage() {
       setError(signInError.message);
       return;
     }
-    router.push("/dashboard");
+    router.push(searchParams.get("next") || "/dashboard");
   }
 
   return (
@@ -38,3 +39,5 @@ export default function SignInPage() {
     </AuthShell>
   );
 }
+
+export default function SignInPage(){return <Suspense fallback={<main className="dashboard-loading"><p>Loading sign in...</p></main>}><SignInContent/></Suspense>}
