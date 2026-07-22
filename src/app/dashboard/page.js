@@ -122,7 +122,9 @@ export default function DashboardPage() {
 
         <nav className="primary-nav">
           <small>Workspace</small>
-          {navItems.map(([icon, label], index) => (
+          {navItems.map(([icon, label], index) => label === "Properties" ? (
+            <Link className="primary-nav-link" href="/properties" key={label}><Icon name={icon} /><span>{label}</span></Link>
+          ) : (
             <button className={index === 0 ? "active" : ""} key={label} type="button"><Icon name={icon} /><span>{label}</span>{label === "Maintenance" && <em>0</em>}</button>
           ))}
         </nav>
@@ -155,10 +157,10 @@ export default function DashboardPage() {
 
         <div className="dashboard-page-head">
           <div><span className="auth-kicker">{isTenant ? "Your rental, all in one place" : "Portfolio overview"}</span><h1>Welcome back, {firstName}.</h1><p>{isTenant ? "Your lease, payments, maintenance, and documents will appear here." : "Here’s what’s happening across your properties today."}</p></div>
-          {!isTenant && <div className="page-actions"><button className="button button-secondary"><Icon name="qr" /> Generate QR</button><button className="button"><Icon name="plus" /> Add Property</button></div>}
+          {!isTenant && <div className="page-actions"><button className="button button-secondary"><Icon name="qr" /> Generate QR</button><Link className="button" href="/properties"><Icon name="plus" /> Add Property</Link></div>}
         </div>
 
-        {isTenant ? <TenantDashboard /> : <LandlordDashboard groups={groups} openGroups={() => setGroupModal(true)} deleteGroup={deleteGroup} />}
+        {isTenant ? <TenantDashboard /> : <LandlordDashboard groups={groups} openGroups={() => setGroupModal(true)} deleteGroup={deleteGroup} properties={metadata.properties || []} />}
       </section>
 
       {groupModal && (
@@ -180,10 +182,12 @@ export default function DashboardPage() {
   );
 }
 
-function LandlordDashboard({ groups, openGroups, deleteGroup }) {
+function LandlordDashboard({ groups, openGroups, deleteGroup, properties }) {
+  const activeProperties = properties.filter((property) => !property.archived);
+  const totalUnits = activeProperties.reduce((sum, property) => sum + Number(property.units || 0), 0);
   return <>
     <div className="dashboard-stat-grid polished">
-      <article><span className="stat-icon purple"><Icon name="properties" /></span><div><small>Properties</small><strong>0</strong><p>5 included on Free</p></div><span className="stat-trend">Ready to add</span></article>
+      <article><span className="stat-icon purple"><Icon name="properties" /></span><div><small>Properties</small><strong>{activeProperties.length}</strong><p>5 included on Free</p></div><span className="stat-trend">{activeProperties.length ? `${totalUnits} total units` : "Ready to add"}</span></article>
       <article><span className="stat-icon lavender"><Icon name="tenants" /></span><div><small>Occupancy</small><strong>—</strong><p>No units added yet</p></div><span className="stat-trend neutral">0 tenants</span></article>
       <article><span className="stat-icon green"><Icon name="rent" /></span><div><small>Monthly rent</small><strong>$0</strong><p>Nothing due yet</p></div><span className="stat-trend neutral">$0 collected</span></article>
       <article><span className="stat-icon amber"><Icon name="maintenance" /></span><div><small>Open maintenance</small><strong>0</strong><p>Everything is clear</p></div><span className="stat-trend success">No action needed</span></article>
@@ -198,7 +202,7 @@ function LandlordDashboard({ groups, openGroups, deleteGroup }) {
       <section className="dashboard-card quick-actions-card">
         <div className="card-heading"><div><h2>Quick actions</h2><p>Common tasks, one click away</p></div></div>
         <div className="quick-action-grid">
-          <button><span><Icon name="properties" /></span><strong>Add property</strong><small>Create your first property</small></button>
+          <Link href="/properties"><span><Icon name="properties" /></span><strong>Add property</strong><small>Create or manage properties</small></Link>
           <button onClick={openGroups}><span><Icon name="folder" /></span><strong>Create group</strong><small>Organize your portfolio</small></button>
           <button><span><Icon name="qr" /></span><strong>Generate QR</strong><small>Connect a tenant in seconds</small></button>
           <button><span><Icon name="tenants" /></span><strong>View tenants</strong><small>Manage connected renters</small></button>
