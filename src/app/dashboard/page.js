@@ -24,6 +24,10 @@ function Icon({ name }) {
     menu: <><path d="M4 6h16M4 12h16M4 18h16"/></>,
     close: <><path d="M18 6 6 18M6 6l12 12"/></>,
     more: <><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></>,
+    user: <><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></>,
+    phone: <><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.63a2 2 0 0 1-.45 2.11L8 9.73a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.85.29 1.73.5 2.63.62A2 2 0 0 1 22 16.92z"/></>,
+    mail: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></>,
+    edit: <><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></>,
   };
   return <svg className="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
@@ -218,41 +222,123 @@ function LandlordDashboard({ groups, openGroups, deleteGroup, properties }) {
 }
 
 function TenantDashboard({ user }) {
-  const [assignment, setAssignment] = useState(null);
-  const [assignmentLoading, setAssignmentLoading] = useState(true);
+  const [dashboard, setDashboard] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [profile, setProfile] = useState({ full_name: "", phone: "", emergency_contact_name: "", emergency_contact_phone: "" });
 
-  useEffect(() => {
-    let active = true;
+  async function loadDashboard() {
+    setLoading(true);
+    setError("");
 
-    async function loadAssignment() {
-      const { data, error } = await supabase
+    const { data: rpcData, error: rpcError } = await supabase.rpc("get_tenant_dashboard");
+    let record = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+
+    if (rpcError) {
+      const { data: fallback, error: fallbackError } = await supabase
         .from("tenant_profiles")
-        .select("property_name, unit_name, status")
+        .select("id, full_name, email, phone, emergency_contact_name, emergency_contact_phone, property_name, unit_name, status, connected_at")
         .eq("tenant_user_id", user.id)
-        .eq("status", "active")
         .order("connected_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (!active) return;
-      if (!error) setAssignment(data || null);
-      setAssignmentLoading(false);
+      if (fallbackError) setError(fallbackError.message);
+      record = fallback || null;
     }
 
-    loadAssignment();
-    return () => { active = false; };
-  }, [user.id]);
+    setDashboard(record || null);
+    setProfile({
+      full_name: record?.full_name || user.user_metadata?.full_name || "",
+      phone: record?.phone || "",
+      emergency_contact_name: record?.emergency_contact_name || "",
+      emergency_contact_phone: record?.emergency_contact_phone || "",
+    });
+    setLoading(false);
+  }
 
-  const linked = Boolean(assignment?.property_name || assignment?.unit_name);
+  useEffect(() => { loadDashboard(); }, [user.id]);
+
+  async function saveProfile(event) {
+    event.preventDefault();
+    if (!dashboard?.profile_id && !dashboard?.id) return setError("Your tenant profile is not ready yet.");
+    if (!profile.full_name.trim()) return setError("Enter your name.");
+
+    setSaving(true);
+    setError("");
+    const profileId = dashboard.profile_id || dashboard.id;
+    const updates = {
+      full_name: profile.full_name.trim(),
+      phone: profile.phone.trim(),
+      emergency_contact_name: profile.emergency_contact_name.trim(),
+      emergency_contact_phone: profile.emergency_contact_phone.trim(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error: updateError } = await supabase.rpc("update_my_tenant_profile", {
+      submitted_profile_id: profileId,
+      submitted_full_name: updates.full_name,
+      submitted_phone: updates.phone,
+      submitted_emergency_contact_name: updates.emergency_contact_name,
+      submitted_emergency_contact_phone: updates.emergency_contact_phone,
+    });
+
+    if (!updateError) {
+      await supabase.auth.updateUser({ data: { full_name: updates.full_name } });
+      setEditing(false);
+      await loadDashboard();
+    } else setError(updateError.message);
+    setSaving(false);
+  }
+
+  const linked = Boolean(dashboard?.property_name || dashboard?.unit_name);
+  const managementName = dashboard?.management_name || "Property management";
+  const managementEmail = dashboard?.management_email || "Not provided";
+  const managementPhone = dashboard?.management_phone || "Not provided";
+  const tenantEmail = dashboard?.email || user.email;
 
   return <>
-    <div className="dashboard-stat-grid polished tenant-stats">
-      <article><span className="stat-icon purple"><Icon name="properties" /></span><div><small>Current property</small><strong>{assignmentLoading ? "Loading..." : assignment?.property_name || "Not linked"}</strong><p>{assignment?.unit_name ? `Unit: ${assignment.unit_name}` : "Scan a landlord QR to connect"}</p></div></article>
-      <article><span className="stat-icon green"><Icon name="rent" /></span><div><small>Amount due</small><strong>$0</strong><p>No balance due</p></div></article>
-      <article><span className="stat-icon amber"><Icon name="maintenance" /></span><div><small>Open maintenance</small><strong>0</strong><p>No open requests</p></div></article>
+    <div className="tenant-overview-grid">
+      <section className="dashboard-card tenant-home-card">
+        <div className="tenant-section-heading"><div><span className="tenant-card-icon"><Icon name="properties" /></span><div><small>Your home</small><h2>Current property and unit</h2></div></div><span className={`tenant-status ${linked ? "active" : "pending"}`}>{linked ? "Active" : "Pending"}</span></div>
+        {loading ? <p className="tenant-muted">Loading your assignment...</p> : linked ? <div className="tenant-home-details"><div><small>Property</small><strong>{dashboard.property_name}</strong></div><div><small>Unit</small><strong>{dashboard.unit_name || "Not listed"}</strong></div><div><small>Connected</small><strong>{dashboard.connected_at ? new Date(dashboard.connected_at).toLocaleDateString() : "Active tenant"}</strong></div></div> : <div className="tenant-empty-state"><h3>No unit connected yet</h3><p>Scan your landlord’s QR code or enter the unit code to connect your account.</p><Link className="button" href="/connect"><Icon name="qr" /> Connect to a unit</Link></div>}
+      </section>
+
+      <section className="dashboard-card tenant-management-card">
+        <div className="tenant-section-heading"><div><span className="tenant-card-icon"><Icon name="user" /></span><div><small>Your management</small><h2>Contact details</h2></div></div></div>
+        <div className="management-contact-list">
+          <div><Icon name="user" /><span><small>Management contact</small><strong>{loading ? "Loading..." : managementName}</strong></span></div>
+          <div><Icon name="mail" /><span><small>Email</small><strong>{loading ? "Loading..." : managementEmail}</strong></span>{managementEmail !== "Not provided" && <a href={`mailto:${managementEmail}`}>Email</a>}</div>
+          <div><Icon name="phone" /><span><small>Phone</small><strong>{loading ? "Loading..." : managementPhone}</strong></span>{managementPhone !== "Not provided" && <a href={`tel:${managementPhone}`}>Call</a>}</div>
+        </div>
+      </section>
     </div>
-    {!linked && !assignmentLoading && <section className="dashboard-card tenant-connect-card"><span className="modal-icon"><Icon name="qr" /></span><h2>Connect with your landlord</h2><p>Scan the 24-hour QR code provided by your landlord. You’ll be automatically connected to the correct property and unit after signing in.</p><Link className="button" href="/connect"><Icon name="qr" /> Enter Unit Code</Link></section>}
-    {linked && <section className="dashboard-card tenant-connect-card"><span className="modal-icon"><Icon name="properties" /></span><h2>You’re connected</h2><p>Your tenant account is linked to <strong>{assignment.property_name}</strong>{assignment.unit_name ? `, ${assignment.unit_name}` : ""}.</p></section>}
+
+    <section className="dashboard-card tenant-profile-dashboard-card">
+      <div className="card-heading"><div><h2>My profile</h2><p>Keep your contact and emergency information current.</p></div><button className="button button-small button-secondary" onClick={() => setEditing(true)} disabled={!dashboard}><Icon name="edit" /> Edit profile</button></div>
+      <div className="tenant-basic-profile">
+        <div><small>Name</small><strong>{profile.full_name || "Not added"}</strong></div>
+        <div><small>Email</small><strong>{tenantEmail}</strong></div>
+        <div><small>Phone</small><strong>{profile.phone || "Not added"}</strong></div>
+        <div><small>Emergency contact</small><strong>{profile.emergency_contact_name || "Not added"}</strong><span>{profile.emergency_contact_phone || ""}</span></div>
+      </div>
+    </section>
+
+    <section className="tenant-future-section">
+      <div className="card-heading"><div><h2>Your tenant tools</h2><p>These areas are ready for the next TamLynk updates.</p></div></div>
+      <div className="tenant-feature-grid">
+        <article><span><Icon name="rent" /></span><div><small>Coming soon</small><h3>Payments</h3><p>View balances, due dates, and payment history.</p></div></article>
+        <article><span><Icon name="maintenance" /></span><div><small>Coming soon</small><h3>Maintenance</h3><p>Submit and track repair requests.</p></div></article>
+        <article><span><Icon name="documents" /></span><div><small>Coming soon</small><h3>Documents</h3><p>Access notices, receipts, and shared files.</p></div></article>
+        <article><span><Icon name="lease" /></span><div><small>Coming soon</small><h3>Lease</h3><p>Review lease details and important dates.</p></div></article>
+      </div>
+    </section>
+
+    {error && <p className="form-message error-message tenant-dashboard-error">{error}</p>}
+
+    {editing && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setEditing(false)}><section className="app-modal property-modal tenant-profile-modal"><button className="icon-button modal-close" onClick={() => setEditing(false)} aria-label="Close"><Icon name="close" /></button><span className="modal-icon"><Icon name="user" /></span><h2>Edit my profile</h2><p>Your management team will see these contact details.</p><form className="property-form" onSubmit={saveProfile}><div className="form-grid two"><label>Name<input value={profile.full_name} onChange={(event) => setProfile({...profile, full_name: event.target.value})} /></label><label>Email<input value={tenantEmail} disabled /></label></div><label>Phone<input type="tel" value={profile.phone} onChange={(event) => setProfile({...profile, phone: event.target.value})} placeholder="(555) 555-5555" /></label><div className="form-grid two"><label>Emergency contact<input value={profile.emergency_contact_name} onChange={(event) => setProfile({...profile, emergency_contact_name: event.target.value})} placeholder="Full name" /></label><label>Emergency contact phone<input type="tel" value={profile.emergency_contact_phone} onChange={(event) => setProfile({...profile, emergency_contact_phone: event.target.value})} placeholder="(555) 555-5555" /></label></div>{error && <p className="form-message error-message">{error}</p>}<div className="modal-actions"><button type="button" className="button button-secondary" onClick={() => setEditing(false)}>Cancel</button><button className="button" disabled={saving}>{saving ? "Saving..." : "Save profile"}</button></div></form></section></div>}
   </>;
 }
 
