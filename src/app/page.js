@@ -54,8 +54,8 @@ export default function HomePage() {
           </nav>
 
           <div className="nav-actions">
-            <a className="text-button" href="#signin">Sign In</a>
-            <a className="button button-small" href="#signup">Sign Up</a>
+            <a className="text-button" href="/sign-in">Sign In</a>
+            <a className="button button-small" href="/sign-up">Sign Up</a>
           </div>
 
           <details className="mobile-menu">
@@ -66,8 +66,8 @@ export default function HomePage() {
               <a href="#features">Features</a>
               <a href="#solutions">Solutions</a>
               <a href="#pricing">Pricing</a>
-              <a href="#signin">Sign In</a>
-              <a className="button" href="#signup">Sign Up</a>
+              <a href="/sign-in">Sign In</a>
+              <a className="button" href="/sign-up">Sign Up</a>
             </div>
           </details>
         </div>
@@ -82,7 +82,7 @@ export default function HomePage() {
               Manage properties, tenants, leases, rent, maintenance, and documents from one modern platform built for both sides of the rental experience.
             </p>
             <div className="hero-actions">
-              <a className="button" href="#signup">Get Started Free</a>
+              <a className="button" href="/sign-up?plan=free">Get Started Free</a>
               <a className="button button-secondary" href="#features">Explore Features</a>
             </div>
             <div className="hero-note">
@@ -161,7 +161,7 @@ export default function HomePage() {
                 <span className="feature-icon">{feature.icon}</span>
                 <h3>{feature.title}</h3>
                 <p>{feature.description}</p>
-                <a href="#signup">Learn more <span>→</span></a>
+                <a href="/sign-up">Learn more <span>→</span></a>
               </article>
             ))}
           </div>
@@ -185,7 +185,7 @@ export default function HomePage() {
                 <li><CheckIcon />Organize maintenance and documents</li>
                 <li><CheckIcon />See portfolio activity in one dashboard</li>
               </ul>
-              <a className="inline-link" href="#signup">Start managing smarter →</a>
+              <a className="inline-link" href="/sign-up">Start managing smarter →</a>
             </article>
             <article className="solution-card tenant-card">
               <div className="solution-badge">For tenants</div>
@@ -197,7 +197,7 @@ export default function HomePage() {
                 <li><CheckIcon />Access lease documents</li>
                 <li><CheckIcon />Stay connected with management</li>
               </ul>
-              <a className="inline-link" href="#signup">See the tenant experience →</a>
+              <a className="inline-link" href="/sign-up">See the tenant experience →</a>
             </article>
           </div>
         </div>
@@ -221,7 +221,7 @@ export default function HomePage() {
                 <li><CheckIcon />Lease tracking</li>
                 <li><CheckIcon />Basic dashboard</li>
               </ul>
-              <a className="button button-secondary full-button" href="#signup">Get Started</a>
+              <a className="button button-secondary full-button" href="/sign-up?plan=free">Get Started</a>
             </article>
 
             <article className="price-card featured-price">
@@ -235,7 +235,7 @@ export default function HomePage() {
                 <li><CheckIcon />Maintenance requests</li>
                 <li><CheckIcon />Secure documents</li>
               </ul>
-              <a className="button full-button" href="#signup">Join the Waitlist</a>
+              <a className="button full-button" href="/sign-up?plan=pro">Join the Waitlist</a>
             </article>
 
             <article className="price-card">
@@ -259,11 +259,11 @@ export default function HomePage() {
           <div>
             <span className="eyebrow">Get TamLynked</span>
             <h2>Bring your rentals together in one place.</h2>
-            <p>TamLynk is currently being built. Join early and be among the first to know when accounts open.</p>
+            <p>Create your account now and access the first working version of the TamLynk dashboard.</p>
           </div>
           <div className="cta-actions">
-            <a className="button button-light" href="mailto:hello@tamlynk.com?subject=TamLynk%20Early%20Access">Request Early Access</a>
-            <a className="cta-signin" id="signin" href="mailto:hello@tamlynk.com?subject=TamLynk%20Sign%20In%20Question">Already interested? Contact us →</a>
+            <a className="button button-light" href="/sign-up?plan=free">Create Free Account</a>
+            <a className="cta-signin" href="/sign-in">Already have an account? Sign in →</a>
           </div>
         </div>
       </section>
@@ -278,7 +278,7 @@ export default function HomePage() {
             <p>Tenant and Management — TamLynked Together.</p>
           </div>
           <div className="footer-links"><strong>Product</strong><a href="#features">Features</a><a href="#solutions">Solutions</a><a href="#pricing">Pricing</a></div>
-          <div className="footer-links"><strong>Company</strong><a href="mailto:hello@tamlynk.com">Contact</a><a href="#top">About</a><a href="#signup">Early Access</a></div>
+          <div className="footer-links"><strong>Company</strong><a href="mailto:hello@tamlynk.com">Contact</a><a href="#top">About</a><a href="/sign-up">Create Account</a></div>
           <div className="footer-links"><strong>Legal</strong><a href="#">Privacy</a><a href="#">Terms</a><a href="mailto:hello@tamlynk.com">Support</a></div>
         </div>
         <div className="container footer-bottom">
