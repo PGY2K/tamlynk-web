@@ -36,6 +36,7 @@ export default function TenantsPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [tenants, setTenants] = useState([]);
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -53,15 +54,19 @@ export default function TenantsPage() {
       if (authData.user.user_metadata?.account_type === "tenant") return router.replace("/dashboard");
       setUser(authData.user);
 
-      const { data, error: loadError } = await supabase
+      const [{ data, error: loadError }, { data: historyData, error: historyError }] = await Promise.all([supabase
         .from("tenant_profiles")
         .select("*")
         .eq("landlord_id", authData.user.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false }),
+        supabase.from("occupancy_history").select("id, tenant_profile_id, property_name, unit_name, moved_in_at, moved_out_at").eq("landlord_id", authData.user.id).order("moved_in_at", { ascending: false })
+      ]);
 
       if (!active) return;
       if (loadError) setError(loadError.message);
+      if (historyError && historyError.code !== "42P01") setError(historyError.message);
       setTenants(data || []);
+      setHistory(historyData || []);
       setLoading(false);
     }
     load();
@@ -193,6 +198,17 @@ export default function TenantsPage() {
           <div><small>Current property</small><strong>{editing.property_name || "Not assigned"}</strong></div>
           <div><small>Current unit</small><strong>{editing.unit_name || "Not assigned"}</strong></div>
         </div>
+
+
+        <section className="tenant-rental-history">
+          <div className="card-heading"><div><h3>Rental history</h3><p>Permanent property and unit assignments.</p></div></div>
+          {history.filter((record) => record.tenant_profile_id === editing.id).length ? <div className="occupancy-timeline compact">
+            {history.filter((record) => record.tenant_profile_id === editing.id).map((record) => <article key={record.id} className={!record.moved_out_at ? "current" : ""}>
+              <span className="timeline-dot"/>
+              <div><div className="history-row-heading"><strong>{record.property_name || "Property"} · {record.unit_name || "Unit"}</strong>{!record.moved_out_at && <em>Current</em>}</div><p>{new Date(record.moved_in_at).toLocaleDateString()} – {record.moved_out_at ? new Date(record.moved_out_at).toLocaleDateString() : "Present"}</p></div>
+            </article>)}
+          </div> : <p className="tenant-muted">No occupancy records yet.</p>}
+        </section>
 
         <form className="property-form" onSubmit={saveProfile}>
           <div className="form-grid two">

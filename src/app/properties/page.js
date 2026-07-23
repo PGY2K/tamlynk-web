@@ -39,6 +39,8 @@ export default function PropertiesPage() {
   const [loading, setLoading] = useState(true);
   const [properties, setProperties] = useState([]);
   const [groups, setGroups] = useState([]);
+  const [occupancyHistory, setOccupancyHistory] = useState([]);
+  const [historyProperty, setHistoryProperty] = useState(null);
   const [query, setQuery] = useState("");
   const [groupFilter, setGroupFilter] = useState("all");
   const [showArchived, setShowArchived] = useState(false);
@@ -57,6 +59,11 @@ export default function PropertiesPage() {
       setUser(data.user);
       setProperties(data.user.user_metadata?.properties || []);
       setGroups(data.user.user_metadata?.property_groups || []);
+      supabase.from("occupancy_history")
+        .select("id, property_id, unit_id, tenant_name, tenant_email, property_name, unit_name, moved_in_at, moved_out_at")
+        .eq("landlord_id", data.user.id)
+        .order("moved_in_at", { ascending: false })
+        .then(({ data: records }) => { if (active) setOccupancyHistory(records || []); });
       setLoading(false);
     });
     return () => { active = false; };
@@ -141,10 +148,20 @@ export default function PropertiesPage() {
         <div className="property-card-body"><div className="property-title-row"><div><h2>{property.name}</h2><p>{property.address}, {property.city}, {property.state} {property.zip}</p></div></div>
           <div className="property-meta"><span><Icon name="units" /><strong>{property.units}</strong> {Number(property.units) === 1 ? "unit" : "units"}</span><span><Icon name="folder" />{group?.name || "Ungrouped"}</span></div>
           {property.notes && <p className="property-notes">{property.notes}</p>}
-          <div className="property-card-actions"><Link href={`/units?property=${property.id}`}>View Units</Link><button onClick={() => openEdit(property)}><Icon name="edit" /> Edit</button><button onClick={() => archiveProperty(property)}><Icon name="archive" /> {property.archived ? "Restore" : "Archive"}</button>{property.archived && <button className="danger" onClick={() => deleteProperty(property)}><Icon name="trash" /> Delete</button>}</div>
+          <div className="property-card-actions"><Link href={`/units?property=${property.id}`}>View Units</Link><button onClick={() => setHistoryProperty(property)}>Occupancy History</button><button onClick={() => openEdit(property)}><Icon name="edit" /> Edit</button><button onClick={() => archiveProperty(property)}><Icon name="archive" /> {property.archived ? "Restore" : "Archive"}</button>{property.archived && <button className="danger" onClick={() => deleteProperty(property)}><Icon name="trash" /> Delete</button>}</div>
         </div>
       </article>;
     })}</section> : <section className="properties-empty"><span><Icon name={showArchived ? "archive" : "home"} /></span><h2>{showArchived ? "No archived properties" : query || groupFilter !== "all" ? "No properties match those filters" : "Add your first property"}</h2><p>{showArchived ? "Properties you archive will stay safely stored here." : "Create a property now, then you’ll be ready to add units and connect tenants."}</p>{!showArchived && !query && groupFilter === "all" && <button className="button" onClick={openAdd}><Icon name="plus" /> Add Property</button>}</section>}
+
+
+    {historyProperty && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setHistoryProperty(null)}><section className="app-modal property-modal property-history-modal" role="dialog" aria-modal="true">
+      <button className="icon-button modal-close" onClick={() => setHistoryProperty(null)} aria-label="Close"><Icon name="close" /></button>
+      <span className="modal-icon"><Icon name="units" /></span><h2>{historyProperty.name} occupancy history</h2><p>Current and former occupants across every unit at this property.</p>
+      {occupancyHistory.filter((record) => record.property_id === historyProperty.id).length ? <div className="occupancy-timeline property-history-list">
+        {occupancyHistory.filter((record) => record.property_id === historyProperty.id).map((record) => <article key={record.id} className={!record.moved_out_at ? "current" : ""}><span className="timeline-dot"/><div><div className="history-row-heading"><strong>{record.tenant_name || record.tenant_email || "Tenant"}</strong>{!record.moved_out_at && <em>Current</em>}</div><p>{record.unit_name || "Unit"} · {new Date(record.moved_in_at).toLocaleDateString()} – {record.moved_out_at ? new Date(record.moved_out_at).toLocaleDateString() : "Present"}</p><small>{record.tenant_email || "No email recorded"}</small></div></article>)}
+      </div> : <div className="inline-empty occupancy-empty"><div><strong>No occupancy history yet</strong><p>Records will appear automatically when tenants connect to units at this property.</p></div></div>}
+      <div className="modal-actions"><button className="button" onClick={() => setHistoryProperty(null)}>Close</button></div>
+    </section></div>}
 
     {modalOpen && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setModalOpen(false)}><section className="app-modal property-modal" role="dialog" aria-modal="true">
       <button className="icon-button modal-close" onClick={() => setModalOpen(false)} aria-label="Close"><Icon name="close" /></button>

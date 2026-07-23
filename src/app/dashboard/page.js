@@ -223,6 +223,7 @@ function LandlordDashboard({ groups, openGroups, deleteGroup, properties }) {
 
 function TenantDashboard({ user }) {
   const [dashboard, setDashboard] = useState(null);
+  const [rentalHistory, setRentalHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(false);
@@ -249,7 +250,14 @@ function TenantDashboard({ user }) {
       record = fallback || null;
     }
 
+    const { data: historyData } = await supabase
+      .from("occupancy_history")
+      .select("id, property_name, unit_name, moved_in_at, moved_out_at")
+      .eq("tenant_user_id", user.id)
+      .order("moved_in_at", { ascending: false });
+
     setDashboard(record || null);
+    setRentalHistory(historyData || []);
     setProfile({
       full_name: record?.full_name || user.user_metadata?.full_name || "",
       phone: record?.phone || "",
@@ -324,6 +332,11 @@ function TenantDashboard({ user }) {
         <div><small>Phone</small><strong>{profile.phone || "Not added"}</strong></div>
         <div><small>Emergency contact</small><strong>{profile.emergency_contact_name || "Not added"}</strong><span>{profile.emergency_contact_phone || ""}</span></div>
       </div>
+    </section>
+
+    <section className="dashboard-card tenant-history-dashboard-card">
+      <div className="card-heading"><div><h2>Rental history</h2><p>Your permanent TamLynk occupancy record.</p></div><span className="history-count">{rentalHistory.length} {rentalHistory.length === 1 ? "record" : "records"}</span></div>
+      {rentalHistory.length ? <div className="occupancy-timeline">{rentalHistory.map((record) => <article key={record.id} className={!record.moved_out_at ? "current" : ""}><span className="timeline-dot"/><div><div className="history-row-heading"><strong>{record.property_name || "Property"} · {record.unit_name || "Unit"}</strong>{!record.moved_out_at && <em>Current</em>}</div><p>{new Date(record.moved_in_at).toLocaleDateString()} – {record.moved_out_at ? new Date(record.moved_out_at).toLocaleDateString() : "Present"}</p></div></article>)}</div> : <p className="tenant-muted">Your rental history will appear after you connect to a unit.</p>}
     </section>
 
     <section className="tenant-future-section">
