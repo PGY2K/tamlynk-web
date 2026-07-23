@@ -24,12 +24,61 @@ function Icon({ name }) {
     home: <><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></>,
     edit: <><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></>,
     close: <><path d="M18 6 6 18M6 6l12 12"/></>,
+    archive: <><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></>,
+    warning: <><path d="M10.3 2.9 1.8 17a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L14.7 2.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></>,
   };
   return <svg className="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
 
 function initials(name, email) {
   return (name || email || "T").split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+}
+
+function pdfEscape(value) {
+  return String(value ?? "").replace(/\/g, "\\").replace(/\(/g, "\(").replace(/\)/g, "\)").replace(/[^\x20-\x7E]/g, "-");
+}
+
+function downloadArchivePdf(archive) {
+  const snap = archive.snapshot || archive;
+  const lines = [
+    "TamLynk Tenant Archive",
+    `Archived: ${new Date(archive.archived_at || Date.now()).toLocaleString()}`,
+    "",
+    `Tenant: ${snap.full_name || "Tenant"}`,
+    `Email: ${snap.email || "Not provided"}`,
+    `Phone: ${snap.phone || "Not provided"}`,
+    `Emergency contact: ${snap.emergency_contact_name || "Not provided"}`,
+    `Emergency phone: ${snap.emergency_contact_phone || "Not provided"}`,
+    "",
+    `Property: ${snap.property_name || "Not assigned"}`,
+    `Unit: ${snap.unit_name || "Not assigned"}`,
+    `Move in: ${snap.moved_in_at ? new Date(snap.moved_in_at).toLocaleDateString() : "Not recorded"}`,
+    `Move out: ${snap.moved_out_at ? new Date(snap.moved_out_at).toLocaleDateString() : new Date().toLocaleDateString()}`,
+    "",
+    `Management notes: ${snap.notes || "None"}`,
+  ];
+  const content = lines.map((line, index) => `BT /F1 ${index === 0 ? 18 : 11} Tf 54 ${760 - index * 28} Td (${pdfEscape(line)}) Tj ET`).join("\n");
+  const objects = [
+    "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+    "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
+    "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >> endobj",
+    `4 0 obj << /Length ${content.length} >> stream\n${content}\nendstream endobj`,
+    "5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  for (const object of objects) { offsets.push(pdf.length); pdf += `${object}\n`; }
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  pdf += offsets.slice(1).map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`).join("");
+  pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  const blob = new Blob([pdf], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${(snap.full_name || "tenant").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-archive.pdf`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export default function TenantsPage() {
@@ -44,6 +93,10 @@ export default function TenantsPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [removing, setRemoving] = useState(null);
+  const [confirmName, setConfirmName] = useState("");
+  const [confirmRemove, setConfirmRemove] = useState("");
+  const [archiving, setArchiving] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -133,6 +186,31 @@ export default function TenantsPage() {
     if (saveError) return setError(saveError.message);
     setTenants((current) => current.map((tenant) => tenant.id === data.id ? data : tenant));
     setEditing(null);
+  }
+
+  function openRemoval(tenant) {
+    setRemoving(tenant);
+    setConfirmName("");
+    setConfirmRemove("");
+    setError("");
+  }
+
+  async function removeAndArchiveTenant(event) {
+    event.preventDefault();
+    if (!removing) return;
+    if (confirmName.trim() !== (removing.full_name || "Tenant").trim()) return setError("The tenant name does not match.");
+    if (confirmRemove.trim().toUpperCase() !== "REMOVE") return setError('Type REMOVE in the second confirmation box.');
+    setArchiving(true);
+    setError("");
+    const { data, error: removeError } = await supabase.rpc("remove_tenant_and_archive", { p_tenant_profile_id: removing.id });
+    setArchiving(false);
+    if (removeError) return setError(removeError.message);
+    const archive = Array.isArray(data) ? data[0] : data;
+    if (archive) downloadArchivePdf(archive);
+    setTenants((current) => current.map((tenant) => tenant.id === removing.id ? { ...tenant, status: "former", property_id: null, unit_id: null, property_name: null, unit_name: null } : tenant));
+    setHistory((current) => current.map((record) => record.tenant_profile_id === removing.id && !record.moved_out_at ? { ...record, moved_out_at: archive?.archived_at || new Date().toISOString() } : record));
+    setEditing(null);
+    setRemoving(null);
   }
 
   if (loading) return <main className="dashboard-loading"><img src="/tamlynk-logo.png" alt=""/><p>Loading tenant profiles...</p></main>;
@@ -225,7 +303,23 @@ export default function TenantsPage() {
           </div>
           <label>Notes <small className="optional-label">Private to management</small><textarea value={form.notes} onChange={(event) => setForm({...form, notes: event.target.value})} placeholder="Add helpful tenant notes..."/></label>
           {error && <p className="form-message error-message">{error}</p>}
-          <div className="modal-actions"><button type="button" className="button button-secondary" onClick={() => setEditing(null)}>Cancel</button><button className="button" disabled={saving}>{saving ? "Saving..." : "Save Profile"}</button></div>
+          <div className="tenant-profile-footer-actions">{editing.status === "active" && <button type="button" className="danger-link" onClick={() => openRemoval(editing)}><Icon name="archive"/> Remove tenant and archive</button>}<div className="modal-actions"><button type="button" className="button button-secondary" onClick={() => setEditing(null)}>Cancel</button><button className="button" disabled={saving}>{saving ? "Saving..." : "Save Profile"}</button></div></div>
+        </form>
+      </section>
+    </div>}
+
+    {removing && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && !archiving && setRemoving(null)}>
+      <section className="app-modal removal-modal">
+        <button className="icon-button modal-close" onClick={() => !archiving && setRemoving(null)} aria-label="Close"><Icon name="close"/></button>
+        <span className="modal-icon danger"><Icon name="warning"/></span>
+        <h2>Remove and archive tenant</h2>
+        <p>This ends the current occupancy, marks the unit vacant, changes the tenant to Former, and preserves all history. A PDF archive downloads automatically.</p>
+        <div className="removal-summary"><strong>{removing.full_name || "Tenant"}</strong><span>{removing.property_name || "Property"} · {removing.unit_name || "Unit"}</span></div>
+        <form onSubmit={removeAndArchiveTenant}>
+          <label>First confirmation <small>Type the tenant's full name exactly</small><input value={confirmName} onChange={(event) => setConfirmName(event.target.value)} placeholder={removing.full_name || "Tenant"} autoComplete="off"/></label>
+          <label>Second confirmation <small>Type REMOVE</small><input value={confirmRemove} onChange={(event) => setConfirmRemove(event.target.value)} placeholder="REMOVE" autoComplete="off"/></label>
+          {error && <p className="form-message error-message">{error}</p>}
+          <div className="modal-actions"><button type="button" className="button button-secondary" onClick={() => setRemoving(null)} disabled={archiving}>Cancel</button><button className="button danger-button" disabled={archiving || confirmName.trim() !== (removing.full_name || "Tenant").trim() || confirmRemove.trim().toUpperCase() !== "REMOVE"}>{archiving ? "Archiving..." : "Remove Tenant"}</button></div>
         </form>
       </section>
     </div>}
