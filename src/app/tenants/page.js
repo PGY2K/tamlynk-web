@@ -35,7 +35,7 @@ function initials(name, email) {
 }
 
 function pdfEscape(value) {
-  return String(value ?? "").replace(/\/g, "\\").replace(/\(/g, "\(").replace(/\)/g, "\)").replace(/[^\x20-\x7E]/g, "-");
+  return String(value ?? "").replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)").replace(/[^\x20-\x7E]/g, "-");
 }
 
 function downloadArchivePdf(archive) {
