@@ -19,6 +19,7 @@ function Icon({ name }) {
   return <svg className="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
 
+const LEASE_TEMPLATE_BUCKET = "lease-templates";
 const EMPTY_LEASE = { propertyId: "", unitId: "", templateId: "", leaseStart: "", leaseEnd: "", monthlyRent: "", securityDeposit: "", notes: "" };
 
 export default function LeasesPage() {
@@ -78,14 +79,21 @@ export default function LeasesPage() {
     if (templateFile.size > 10 * 1024 * 1024) return setError("The PDF must be 10 MB or smaller.");
 
     setUploading(true);
-    const safeFileName = templateFile.name.replace(/[^a-zA-Z0-9._-]+/g, "-");
-    const storagePath = `${user.id}/${crypto.randomUUID()}-${safeFileName}`;
-    const { error: uploadError } = await supabase.storage.from("lease-templates").upload(storagePath, templateFile, { contentType: "application/pdf", upsert: false });
+    // Store a short generated object name. The original filename remains in the
+    // lease_templates table for display, but is not used as part of the Storage key.
+    const storagePath = `${user.id}/${crypto.randomUUID()}.pdf`;
+    const { error: uploadError } = await supabase.storage
+      .from(LEASE_TEMPLATE_BUCKET)
+      .upload(storagePath, templateFile, {
+        contentType: "application/pdf",
+        cacheControl: "3600",
+        upsert: false,
+      });
     if (uploadError) { setUploading(false); return setError(uploadError.message); }
 
     const { error: insertError } = await supabase.from("lease_templates").insert({ landlord_id: user.id, name: cleanName, file_name: templateFile.name, storage_path: storagePath });
     if (insertError) {
-      await supabase.storage.from("lease-templates").remove([storagePath]);
+      await supabase.storage.from(LEASE_TEMPLATE_BUCKET).remove([storagePath]);
       setUploading(false);
       return setError(insertError.message);
     }
@@ -96,7 +104,7 @@ export default function LeasesPage() {
   }
 
   async function previewTemplate(template) {
-    const { data, error: signedError } = await supabase.storage.from("lease-templates").createSignedUrl(template.storage_path, 600);
+    const { data, error: signedError } = await supabase.storage.from(LEASE_TEMPLATE_BUCKET).createSignedUrl(template.storage_path, 600);
     if (signedError) return setError(signedError.message);
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   }
@@ -116,7 +124,7 @@ export default function LeasesPage() {
     if (!window.confirm(`Delete “${template.name}”?`)) return;
     const { error: deleteError } = await supabase.from("lease_templates").delete().eq("id", template.id).eq("landlord_id", user.id);
     if (deleteError) return setError(deleteError.message);
-    await supabase.storage.from("lease-templates").remove([template.storage_path]);
+    await supabase.storage.from(LEASE_TEMPLATE_BUCKET).remove([template.storage_path]);
     setTemplates((current) => current.filter((item) => item.id !== template.id));
   }
 
