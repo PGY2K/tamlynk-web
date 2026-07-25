@@ -20,19 +20,12 @@ function Icon({ name }) {
 }
 
 const LEASE_TEMPLATE_BUCKET = "lease-templates";
-const INLINE_PDF_PREFIX = "data:application/pdf;base64,";
-
-function isInlineLeasePdf(value) {
-  return typeof value === "string" && value.startsWith(INLINE_PDF_PREFIX);
-}
-
-function readPdfAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(new Error("The PDF could not be read."));
-    reader.readAsDataURL(file);
-  });
+function safeStorageFileName(name) {
+  return name
+    .normalize("NFKD")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "") || "lease-template.pdf";
 }
 
 const EMPTY_LEASE = { propertyId: "", unitId: "", templateId: "", leaseStart: "", leaseEnd: "", monthlyRent: "", securityDeposit: "", notes: "" };
@@ -91,31 +84,33 @@ export default function LeasesPage() {
     if (!cleanName) return setError("Enter a name for the lease template.");
     if (!templateFile) return setError("Choose a PDF file.");
     if (templateFile.type !== "application/pdf") return setError("Lease templates must be PDF files.");
-    if (templateFile.size > 4 * 1024 * 1024) return setError("The PDF must be 4 MB or smaller.");
+    if (templateFile.size > 10 * 1024 * 1024) return setError("The PDF must be 10 MB or smaller.");
 
     setUploading(true);
 
-    let pdfDataUrl;
-    try {
-      pdfDataUrl = await readPdfAsDataUrl(templateFile);
-    } catch (readError) {
-      setUploading(false);
-      return setError(readError.message);
-    }
+    const storagePath = `${user.id}/${crypto.randomUUID()}-${safeStorageFileName(templateFile.name)}`;
+    const { error: uploadError } = await supabase.storage
+      .from(LEASE_TEMPLATE_BUCKET)
+      .upload(storagePath, templateFile, {
+        contentType: "application/pdf",
+        cacheControl: "3600",
+        upsert: false,
+      });
 
-    if (!isInlineLeasePdf(pdfDataUrl)) {
+    if (uploadError) {
       setUploading(false);
-      return setError("The selected file could not be prepared as a PDF.");
+      return setError(`PDF upload failed: ${uploadError.message}`);
     }
 
     const { error: insertError } = await supabase.from("lease_templates").insert({
       landlord_id: user.id,
       name: cleanName,
       file_name: templateFile.name,
-      storage_path: pdfDataUrl,
+      storage_path: storagePath,
     });
 
     if (insertError) {
+      await supabase.storage.from(LEASE_TEMPLATE_BUCKET).remove([storagePath]);
       setUploading(false);
       return setError(insertError.message);
     }
@@ -129,10 +124,6 @@ export default function LeasesPage() {
   }
 
   async function previewTemplate(template) {
-    if (isInlineLeasePdf(template.storage_path)) {
-      window.open(template.storage_path, "_blank", "noopener,noreferrer");
-      return;
-    }
     const { data, error: signedError } = await supabase.storage.from(LEASE_TEMPLATE_BUCKET).createSignedUrl(template.storage_path, 600);
     if (signedError) return setError(signedError.message);
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
@@ -153,9 +144,7 @@ export default function LeasesPage() {
     if (!window.confirm(`Delete “${template.name}”?`)) return;
     const { error: deleteError } = await supabase.from("lease_templates").delete().eq("id", template.id).eq("landlord_id", user.id);
     if (deleteError) return setError(deleteError.message);
-    if (!isInlineLeasePdf(template.storage_path)) {
-      await supabase.storage.from(LEASE_TEMPLATE_BUCKET).remove([template.storage_path]);
-    }
+    await supabase.storage.from(LEASE_TEMPLATE_BUCKET).remove([template.storage_path]);
     setTemplates((current) => current.filter((item) => item.id !== template.id));
   }
 
