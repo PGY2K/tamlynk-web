@@ -26,6 +26,15 @@ function isInlineLeasePdf(value) {
   return typeof value === "string" && value.startsWith(INLINE_PDF_PREFIX);
 }
 
+function readPdfAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("The PDF could not be read."));
+    reader.readAsDataURL(file);
+  });
+}
+
 const EMPTY_LEASE = { propertyId: "", unitId: "", templateId: "", leaseStart: "", leaseEnd: "", monthlyRent: "", securityDeposit: "", notes: "" };
 
 export default function LeasesPage() {
@@ -82,40 +91,38 @@ export default function LeasesPage() {
     if (!cleanName) return setError("Enter a name for the lease template.");
     if (!templateFile) return setError("Choose a PDF file.");
     if (templateFile.type !== "application/pdf") return setError("Lease templates must be PDF files.");
-    if (templateFile.size > 10 * 1024 * 1024) return setError("The PDF must be 10 MB or smaller.");
+    if (templateFile.size > 4 * 1024 * 1024) return setError("The PDF must be 4 MB or smaller.");
 
     setUploading(true);
 
-    // Refresh the session before calling Storage so the request always carries
-    // the signed-in landlord JWT required by the private bucket policies.
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !sessionData.session) {
+    let pdfDataUrl;
+    try {
+      pdfDataUrl = await readPdfAsDataUrl(templateFile);
+    } catch (readError) {
       setUploading(false);
-      return setError("Your session expired. Sign in again and retry the upload.");
+      return setError(readError.message);
     }
 
-    const storagePath = `${sessionData.session.user.id}/${crypto.randomUUID()}.pdf`;
-
-    const { error: uploadError } = await supabase.storage
-      .from(LEASE_TEMPLATE_BUCKET)
-      .upload(storagePath, templateFile, {
-        contentType: "application/pdf",
-        cacheControl: "3600",
-        upsert: false,
-      });
-
-    if (uploadError) {
+    if (!isInlineLeasePdf(pdfDataUrl)) {
       setUploading(false);
-      return setError(uploadError.message);
+      return setError("The selected file could not be prepared as a PDF.");
     }
 
-    const { error: insertError } = await supabase.from("lease_templates").insert({ landlord_id: user.id, name: cleanName, file_name: templateFile.name, storage_path: storagePath });
+    const { error: insertError } = await supabase.from("lease_templates").insert({
+      landlord_id: user.id,
+      name: cleanName,
+      file_name: templateFile.name,
+      storage_path: pdfDataUrl,
+    });
+
     if (insertError) {
-      await supabase.storage.from(LEASE_TEMPLATE_BUCKET).remove([storagePath]);
       setUploading(false);
       return setError(insertError.message);
     }
-    setTemplateName(""); setTemplateFile(null); setMessage("Lease template uploaded.");
+
+    setTemplateName("");
+    setTemplateFile(null);
+    setMessage("Lease template uploaded.");
     await loadData(user);
     setUploading(false);
     event.currentTarget.reset();
