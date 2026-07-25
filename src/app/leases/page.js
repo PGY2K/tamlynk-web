@@ -79,9 +79,18 @@ export default function LeasesPage() {
     if (templateFile.size > 10 * 1024 * 1024) return setError("The PDF must be 10 MB or smaller.");
 
     setUploading(true);
-    // Store a short generated object name. The original filename remains in the
-    // lease_templates table for display, but is not used as part of the Storage key.
-    const storagePath = `${user.id}/${crypto.randomUUID()}.pdf`;
+
+    // Refresh the session before calling Storage so the request always carries
+    // the signed-in landlord JWT required by the private bucket policies.
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !sessionData.session) {
+      setUploading(false);
+      return setError("Your session expired. Sign in again and retry the upload.");
+    }
+
+    // Store each landlord's PDFs inside a folder named with their auth user ID.
+    // The Storage policies restrict that folder to the matching signed-in user.
+    const storagePath = `${sessionData.session.user.id}/${crypto.randomUUID()}.pdf`;
     const { error: uploadError } = await supabase.storage
       .from(LEASE_TEMPLATE_BUCKET)
       .upload(storagePath, templateFile, {
@@ -89,7 +98,13 @@ export default function LeasesPage() {
         cacheControl: "3600",
         upsert: false,
       });
-    if (uploadError) { setUploading(false); return setError(uploadError.message); }
+    if (uploadError) {
+      setUploading(false);
+      if (uploadError.message?.toLowerCase().includes("bucket not found")) {
+        return setError("Lease storage is not accessible. Apply the included lease-template Storage migration, then retry.");
+      }
+      return setError(uploadError.message);
+    }
 
     const { error: insertError } = await supabase.from("lease_templates").insert({ landlord_id: user.id, name: cleanName, file_name: templateFile.name, storage_path: storagePath });
     if (insertError) {
