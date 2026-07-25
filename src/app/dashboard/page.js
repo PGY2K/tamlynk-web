@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+function isInlineLeasePdf(value) {
+  return typeof value === "string" && value.startsWith("data:application/pdf;base64,");
+}
 
 const EMPTY_GROUP = "Ungrouped";
 
@@ -260,8 +263,12 @@ function TenantDashboard({ user }) {
     setTenantLease(leaseRecord || null);
     setLeaseUrl("");
     if (leaseRecord?.storage_path) {
-      const { data: signed } = await supabase.storage.from("lease-templates").createSignedUrl(leaseRecord.storage_path, 600);
-      setLeaseUrl(signed?.signedUrl || "");
+      if (isInlineLeasePdf(leaseRecord.storage_path)) {
+        setLeaseUrl(leaseRecord.storage_path);
+      } else {
+        const { data: signed } = await supabase.storage.from("lease-templates").createSignedUrl(leaseRecord.storage_path, 600);
+        setLeaseUrl(signed?.signedUrl || "");
+      }
     }
 
     setDashboard(record || null);

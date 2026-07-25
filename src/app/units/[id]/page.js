@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { formatUnitCode } from "@/lib/unitCodes";
+function isInlineLeasePdf(value) {
+  return typeof value === "string" && value.startsWith("data:application/pdf;base64,");
+}
 
 function formatDate(value) {
   if (!value) return "Present";
@@ -84,6 +87,10 @@ export default function UnitDetail() {
   async function viewTemplate(lease) {
     const template = templates.find((item) => item.id === lease.template_id);
     if (!template) return setError("The lease PDF could not be found.");
+    if (isInlineLeasePdf(template.storage_path)) {
+      window.open(template.storage_path, "_blank", "noopener,noreferrer");
+      return;
+    }
     const { data: signed, error: signedError } = await supabase.storage.from("lease-templates").createSignedUrl(template.storage_path, 600);
     if (signedError) return setError(signedError.message);
     window.open(signed.signedUrl, "_blank", "noopener,noreferrer");
