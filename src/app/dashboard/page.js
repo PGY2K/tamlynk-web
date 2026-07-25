@@ -4,10 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-function isInlineLeasePdf(value) {
-  return typeof value === "string" && value.startsWith("data:application/pdf;base64,");
-}
-
 const EMPTY_GROUP = "Ungrouped";
 
 function Icon({ name }) {
@@ -15,7 +11,6 @@ function Icon({ name }) {
     overview: <><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></>,
     properties: <><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></>,
     tenants: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
-    lease: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8"/></>,
     rent: <><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M7 15h.01"/></>,
     maintenance: <><path d="M14.7 6.3a4 4 0 0 0-5-5L7 4l3 3-6.5 6.5a2.12 2.12 0 0 0 3 3L13 10l3 3 2.7-2.7a4 4 0 0 0-4-4z"/><path d="m12 12 6 6"/></>,
     documents: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></>,
@@ -72,9 +67,9 @@ export default function DashboardPage() {
   const initials = (metadata.full_name || user?.email || "TL").split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
 
   const navItems = useMemo(() => isTenant ? [
-    ["overview", "Overview"], ["rent", "Payments"], ["maintenance", "Maintenance"], ["lease", "Lease"], ["documents", "Documents"]
+    ["overview", "Overview"], ["rent", "Payments"], ["maintenance", "Maintenance"], ["documents", "Documents"]
   ] : [
-    ["overview", "Overview"], ["properties", "Properties"], ["properties", "Units"], ["tenants", "Tenants"], ["lease", "Leases"], ["rent", "Rent"], ["maintenance", "Maintenance"], ["documents", "Documents"]
+    ["overview", "Overview"], ["properties", "Properties"], ["properties", "Units"], ["tenants", "Tenants"], ["rent", "Rent"], ["maintenance", "Maintenance"], ["documents", "Documents"]
   ], [isTenant]);
 
   async function signOut() {
@@ -129,8 +124,8 @@ export default function DashboardPage() {
 
         <nav className="primary-nav">
           <small>Workspace</small>
-          {navItems.map(([icon, label], index) => (["Properties", "Units", "Tenants", "Leases"].includes(label)) ? (
-            <Link className="primary-nav-link" href={label === "Units" ? "/units" : label === "Tenants" ? "/tenants" : label === "Leases" ? "/leases" : "/properties"} key={label}><Icon name={icon} /><span>{label}</span></Link>
+          {navItems.map(([icon, label], index) => (["Properties", "Units", "Tenants"].includes(label)) ? (
+            <Link className="primary-nav-link" href={label === "Units" ? "/units" : label === "Tenants" ? "/tenants" : "/properties"} key={label}><Icon name={icon} /><span>{label}</span></Link>
           ) : (
             <button className={index === 0 ? "active" : ""} key={label} type="button"><Icon name={icon} /><span>{label}</span>{label === "Maintenance" && <em>0</em>}</button>
           ))}
@@ -163,7 +158,7 @@ export default function DashboardPage() {
         </header>
 
         <div className="dashboard-page-head">
-          <div><span className="auth-kicker">{isTenant ? "Your rental, all in one place" : "Portfolio overview"}</span><h1>Welcome back, {firstName}.</h1><p>{isTenant ? "Your lease, payments, maintenance, and documents will appear here." : "Here’s what’s happening across your properties today."}</p></div>
+          <div><span className="auth-kicker">{isTenant ? "Your rental, all in one place" : "Portfolio overview"}</span><h1>Welcome back, {firstName}.</h1><p>{isTenant ? "Your payments, maintenance, and documents will appear here." : "Here’s what’s happening across your properties today."}</p></div>
           {!isTenant && <div className="page-actions"><Link className="button button-secondary" href="/invitations"><Icon name="qr" /> Generate QR</Link><Link className="button" href="/properties"><Icon name="plus" /> Add Property</Link></div>}
         </div>
 
@@ -232,8 +227,6 @@ function TenantDashboard({ user }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState({ full_name: "", phone: "", emergency_contact_name: "", emergency_contact_phone: "" });
-  const [tenantLease, setTenantLease] = useState(null);
-  const [leaseUrl, setLeaseUrl] = useState("");
 
   async function loadDashboard() {
     setLoading(true);
@@ -255,21 +248,7 @@ function TenantDashboard({ user }) {
       record = fallback || null;
     }
 
-    const [{ data: historyData }, { data: leaseData }] = await Promise.all([
-      supabase.from("occupancy_history").select("id, property_name, unit_name, moved_in_at, moved_out_at").eq("tenant_user_id", user.id).order("moved_in_at", { ascending: false }),
-      supabase.rpc("get_my_tenant_lease"),
-    ]);
-    const leaseRecord = Array.isArray(leaseData) ? leaseData[0] : leaseData;
-    setTenantLease(leaseRecord || null);
-    setLeaseUrl("");
-    if (leaseRecord?.storage_path) {
-      if (isInlineLeasePdf(leaseRecord.storage_path)) {
-        setLeaseUrl(leaseRecord.storage_path);
-      } else {
-        const { data: signed } = await supabase.storage.from("lease-templates").createSignedUrl(leaseRecord.storage_path, 600);
-        setLeaseUrl(signed?.signedUrl || "");
-      }
-    }
+    const { data: historyData } = await supabase.from("occupancy_history").select("id, property_name, unit_name, moved_in_at, moved_out_at").eq("tenant_user_id", user.id).order("moved_in_at", { ascending: false });
 
     setDashboard(record || null);
     setRentalHistory(historyData || []);
@@ -354,14 +333,6 @@ function TenantDashboard({ user }) {
       {rentalHistory.length ? <div className="occupancy-timeline">{rentalHistory.map((record) => <article key={record.id} className={!record.moved_out_at ? "current" : ""}><span className="timeline-dot"/><div><div className="history-row-heading"><strong>{record.property_name || "Property"} · {record.unit_name || "Unit"}</strong>{!record.moved_out_at && <em>Current</em>}</div><p>{new Date(record.moved_in_at).toLocaleDateString()} – {record.moved_out_at ? new Date(record.moved_out_at).toLocaleDateString() : "Present"}</p></div></article>)}</div> : <p className="tenant-muted">Your rental history will appear after you connect to a unit.</p>}
     </section>
 
-    <section className="dashboard-card tenant-lease-dashboard-card">
-      <div className="card-heading"><div><h2>Lease</h2><p>Your unit lease details and shared reference document.</p></div>{tenantLease && <span className={`lease-status ${tenantLease.status}`}>{tenantLease.status}</span>}</div>
-      {tenantLease ? <div className="tenant-lease-details">
-        <div className="tenant-lease-document"><small>Lease Template / Reference Copy</small><strong>{tenantLease.template_name}</strong>{leaseUrl && <a className="button button-small button-secondary" href={leaseUrl} target="_blank" rel="noreferrer">View PDF</a>}</div>
-        <div className="lease-facts"><span><small>Lease start</small><strong>{new Date(`${tenantLease.lease_start}T00:00:00`).toLocaleDateString()}</strong></span><span><small>Lease end</small><strong>{tenantLease.lease_end ? new Date(`${tenantLease.lease_end}T00:00:00`).toLocaleDateString() : "Open-ended"}</strong></span><span><small>Monthly rent</small><strong>${Number(tenantLease.monthly_rent || 0).toLocaleString()}</strong></span><span><small>Security deposit</small><strong>${Number(tenantLease.security_deposit || 0).toLocaleString()}</strong></span></div>
-        {tenantLease.notes && <div className="tenant-lease-notes"><small>Management notes</small><p>{tenantLease.notes}</p></div>}
-      </div> : <div className="inline-empty"><div><strong>No lease reference attached</strong><p>Your management team can attach a lease template and lease terms to your unit.</p></div></div>}
-    </section>
 
     <section className="tenant-future-section">
       <div className="card-heading"><div><h2>Your tenant tools</h2><p>These areas are ready for the next TamLynk updates.</p></div></div>
@@ -369,7 +340,6 @@ function TenantDashboard({ user }) {
         <article><span><Icon name="rent" /></span><div><small>Coming soon</small><h3>Payments</h3><p>View balances, due dates, and payment history.</p></div></article>
         <article><span><Icon name="maintenance" /></span><div><small>Coming soon</small><h3>Maintenance</h3><p>Submit and track repair requests.</p></div></article>
         <article><span><Icon name="documents" /></span><div><small>Coming soon</small><h3>Documents</h3><p>Access notices, receipts, and shared files.</p></div></article>
-        <article className={tenantLease ? "tenant-feature-live" : ""}><span><Icon name="lease" /></span><div><small>{tenantLease ? "Available now" : "No lease attached"}</small><h3>Lease</h3><p>{tenantLease ? `${tenantLease.template_name} · ${new Date(`${tenantLease.lease_start}T00:00:00`).toLocaleDateString()}` : "Your management team can attach a lease reference to your unit."}</p>{tenantLease && leaseUrl && <a className="text-action" href={leaseUrl} target="_blank" rel="noreferrer">View Lease Template / Reference Copy</a>}</div></article>
       </div>
     </section>
 

@@ -11,7 +11,7 @@ export default function AuthShell({ eyebrow, title, description, children, foote
         <div className="auth-brand-copy">
           <span className="eyebrow">Property management, connected</span>
           <h1>Tenant and Management — <span>TamLynked Together.</span></h1>
-          <p>Keep properties, tenants, leases, rent, maintenance, and documents connected in one organized workspace.</p>
+          <p>Keep properties, tenants, rent, maintenance, and documents connected in one organized workspace.</p>
         </div>
         <div className="auth-proof-grid">
           <div><strong>5</strong><span>properties included free</span></div>

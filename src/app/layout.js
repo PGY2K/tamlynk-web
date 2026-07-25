@@ -3,7 +3,7 @@ import "./globals.css";
 export const metadata = {
   title: "TamLynk | Tenant and Management, TamLynked Together",
   description:
-    "Manage properties, tenants, leases, rent, maintenance, and documents from one modern property management platform.",
+    "Manage properties, tenants, rent, maintenance, and documents from one modern property management platform.",
   icons: {
     icon: "/tamlynk-logo.png",
     apple: "/tamlynk-logo.png",

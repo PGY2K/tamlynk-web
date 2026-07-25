@@ -49,7 +49,7 @@ function SignInContent() {
       description={
         tenantInvitationMode
           ? "Use your tenant account to finish connecting with your landlord."
-          : "Access your properties, tenants, leases, and account activity."
+          : "Access your properties, tenants, and account activity."
       }
       footer={<>New to TamLynk? <Link href={signUpHref}>{tenantInvitationMode ? "Create a tenant account" : "Create an account"}</Link></>}
     >

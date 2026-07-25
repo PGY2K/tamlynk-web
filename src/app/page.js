@@ -7,12 +7,12 @@ const features = [
   {
     icon: "◎",
     title: "Tenant Management",
-    description: "Manage tenant profiles, contact information, lease details, and account history.",
+    description: "Manage tenant profiles, contact information, and account history.",
   },
   {
     icon: "▤",
-    title: "Lease Tracking",
-    description: "Track active leases, renewal dates, rent terms, and essential documents.",
+    title: "Occupancy Tracking",
+    description: "Track rent terms, due dates, and essential account details.",
   },
   {
     icon: "$",
@@ -27,7 +27,7 @@ const features = [
   {
     icon: "□",
     title: "Secure Documents",
-    description: "Keep leases, notices, inspections, and property files easy to find.",
+    description: "Keep notices, inspections, and property files easy to find.",
   },
 ];
 
@@ -79,7 +79,7 @@ export default function HomePage() {
             <span className="eyebrow">A better way to manage rentals</span>
             <h1>Tenant and Management — <span>TamLynked Together.</span></h1>
             <p>
-              Manage properties, tenants, leases, rent, maintenance, and documents from one modern platform built for both sides of the rental experience.
+              Manage properties, tenants, rent, maintenance, and documents from one modern platform built for both sides of the rental experience.
             </p>
             <div className="hero-actions">
               <a className="button" href="/sign-up?plan=free">Get Started Free</a>
@@ -131,7 +131,7 @@ export default function HomePage() {
                     <div className="panel-title"><strong>Recent activity</strong><span>View all</span></div>
                     <div className="activity"><i>$</i><p><strong>Rent payment received</strong><span>Unit 2B · $1,450</span></p></div>
                     <div className="activity"><i>◇</i><p><strong>New maintenance request</strong><span>Unit 4A · Plumbing</span></p></div>
-                    <div className="activity"><i>▤</i><p><strong>Lease signed</strong><span>Unit 1C · 12 months</span></p></div>
+                    <div className="activity"><i>▤</i><p><strong>Tenant connected</strong><span>Unit 1C · Active occupancy</span></p></div>
                   </article>
                 </div>
               </div>
@@ -181,7 +181,7 @@ export default function HomePage() {
               <p>See what needs attention, keep information organized, and manage your portfolio with less manual work.</p>
               <ul>
                 <li><CheckIcon />Manage properties and units</li>
-                <li><CheckIcon />Track tenants, leases, and balances</li>
+                <li><CheckIcon />Track tenants, occupancy, and balances</li>
                 <li><CheckIcon />Organize maintenance and documents</li>
                 <li><CheckIcon />See portfolio activity in one dashboard</li>
               </ul>
@@ -194,7 +194,7 @@ export default function HomePage() {
               <ul>
                 <li><CheckIcon />View rent and payment history</li>
                 <li><CheckIcon />Submit maintenance requests</li>
-                <li><CheckIcon />Access lease documents</li>
+                <li><CheckIcon />Access shared documents</li>
                 <li><CheckIcon />Stay connected with management</li>
               </ul>
               <a className="inline-link" href="/sign-up">See the tenant experience →</a>
@@ -218,7 +218,7 @@ export default function HomePage() {
               <ul>
                 <li><CheckIcon />Property management</li>
                 <li><CheckIcon />Tenant profiles</li>
-                <li><CheckIcon />Lease tracking</li>
+                <li><CheckIcon />Occupancy history</li>
                 <li><CheckIcon />Basic dashboard</li>
               </ul>
               <a className="button button-secondary full-button" href="/sign-up?plan=free">Get Started</a>
