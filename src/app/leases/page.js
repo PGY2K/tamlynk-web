@@ -26,21 +26,6 @@ function isInlineLeasePdf(value) {
   return typeof value === "string" && value.startsWith(INLINE_PDF_PREFIX);
 }
 
-function readPdfAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(new Error("The PDF could not be read."));
-    reader.readAsDataURL(file);
-  });
-}
-
-async function getLeaseBucketId() {
-  const { data } = await supabase.storage.listBuckets();
-  const match = data?.find((bucket) => bucket.id === LEASE_TEMPLATE_BUCKET || bucket.name === LEASE_TEMPLATE_BUCKET);
-  return match?.id || LEASE_TEMPLATE_BUCKET;
-}
-
 const EMPTY_LEASE = { propertyId: "", unitId: "", templateId: "", leaseStart: "", leaseEnd: "", monthlyRent: "", securityDeposit: "", notes: "" };
 
 export default function LeasesPage() {
@@ -109,39 +94,24 @@ export default function LeasesPage() {
       return setError("Your session expired. Sign in again and retry the upload.");
     }
 
-    // Use Supabase Storage when available. Some projects can display a bucket
-    // in the dashboard while the object API still returns "Bucket not found".
-    // In that case, save the PDF directly with the template record so uploads
-    // continue to work without depending on the broken bucket endpoint.
-    const bucketId = await getLeaseBucketId();
-    let storagePath = `${sessionData.session.user.id}/${crypto.randomUUID()}.pdf`;
-    let storedInBucket = false;
+    const storagePath = `${sessionData.session.user.id}/${crypto.randomUUID()}.pdf`;
 
     const { error: uploadError } = await supabase.storage
-      .from(bucketId)
+      .from(LEASE_TEMPLATE_BUCKET)
       .upload(storagePath, templateFile, {
         contentType: "application/pdf",
         cacheControl: "3600",
         upsert: false,
       });
 
-    if (!uploadError) {
-      storedInBucket = true;
-    } else if (uploadError.message?.toLowerCase().includes("bucket not found")) {
-      try {
-        storagePath = await readPdfAsDataUrl(templateFile);
-      } catch (fileError) {
-        setUploading(false);
-        return setError(fileError.message);
-      }
-    } else {
+    if (uploadError) {
       setUploading(false);
       return setError(uploadError.message);
     }
 
     const { error: insertError } = await supabase.from("lease_templates").insert({ landlord_id: user.id, name: cleanName, file_name: templateFile.name, storage_path: storagePath });
     if (insertError) {
-      if (storedInBucket) await supabase.storage.from(bucketId).remove([storagePath]);
+      await supabase.storage.from(LEASE_TEMPLATE_BUCKET).remove([storagePath]);
       setUploading(false);
       return setError(insertError.message);
     }
@@ -156,8 +126,7 @@ export default function LeasesPage() {
       window.open(template.storage_path, "_blank", "noopener,noreferrer");
       return;
     }
-    const bucketId = await getLeaseBucketId();
-    const { data, error: signedError } = await supabase.storage.from(bucketId).createSignedUrl(template.storage_path, 600);
+    const { data, error: signedError } = await supabase.storage.from(LEASE_TEMPLATE_BUCKET).createSignedUrl(template.storage_path, 600);
     if (signedError) return setError(signedError.message);
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   }
@@ -178,8 +147,7 @@ export default function LeasesPage() {
     const { error: deleteError } = await supabase.from("lease_templates").delete().eq("id", template.id).eq("landlord_id", user.id);
     if (deleteError) return setError(deleteError.message);
     if (!isInlineLeasePdf(template.storage_path)) {
-      const bucketId = await getLeaseBucketId();
-      await supabase.storage.from(bucketId).remove([template.storage_path]);
+      await supabase.storage.from(LEASE_TEMPLATE_BUCKET).remove([template.storage_path]);
     }
     setTemplates((current) => current.filter((item) => item.id !== template.id));
   }
